@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Matrículas por Unidade — Dark</title>
+  <style>
+    :root{
+      --bg:#0b1220; --panel:#0f172a; --text:#e2e8f0; --muted:#94a3b8;
+      --teal:#2dd4bf; --teal-glow: rgba(45,212,191,.35);
+      --orange:#f59e0b; --orange-soft:#ffcc80; --border:#1f2937;
+      --green:#22c55e; --red:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px}
+    .card{width:min(1200px,96vw);border:1px solid var(--border);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));box-shadow:0 12px 30px rgba(0,0,0,.35);padding:22px;position:relative}
+    .title{font-weight:800;letter-spacing:-.01em;margin:0 0 2px 0}
+    .sub{color:var(--muted);font-size:.95rem;margin-bottom:14px}
+    .grid-bg{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(to right,rgba(148,163,184,.07) 1px,transparent 1px),linear-gradient(to bottom,rgba(148,163,184,.06) 1px,transparent 1px);background-size:38px 38px;mask-image:radial-gradient(ellipse at center,rgba(0,0,0,.85),transparent 70%)}
+
+    .counter{color:var(--teal);font-size:18vw;font-weight:900;line-height:.85;text-align:center;filter:drop-shadow(0 0 12px var(--teal-glow));text-shadow:0 8px 30px rgba(0,0,0,.55);-webkit-text-stroke:1px rgba(0,0,0,.5)}
+    @media (min-width:900px){.counter{font-size:14vw}}
+
+    .progress-wrap{margin:14px 0 6px 0}
+    .bar{height:46px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));border:1px solid var(--border);overflow:hidden;position:relative;box-shadow:inset 0 2px 8px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.25)}
+    .bar > .fill{height:100%;width:0;background:linear-gradient(90deg,var(--orange),#f79009);position:relative;box-shadow:0 0 20px rgba(245,158,11,.35),0 0 60px rgba(245,158,11,.2);transition:width .8s cubic-bezier(.4,0,.2,1);overflow:hidden}
+    .bar > .fill::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:translateX(-100%);animation:shimmer 2.6s infinite;mix-blend-mode:screen}
+
+    .info{text-align:center;color:var(--muted);font-weight:600}
+    .info .strong{color:var(--text);font-weight:700}
+    .update{position:absolute;top:16px;right:16px;color:var(--muted);font-size:.85rem;background:rgba(15,23,42,.6);backdrop-filter:blur(8px);padding:6px 10px;border-radius:10px;border:1px solid var(--border)}
+
+    .rows{margin-top:18px;display:grid;grid-template-columns:1fr;gap:10px}
+    @media (min-width:900px){.rows{grid-template-columns:1fr 1fr}}
+    .row{display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.02);padding:12px}
+    .row-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .row-top .name{font-weight:700}
+    .row-top .value{font-variant-numeric:tabular-nums;letter-spacing:.02em}
+    .row .mini{height:18px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden;border:1px solid var(--border)}
+    .row .mini > .mini-fill{height:100%;width:0;background:linear-gradient(90deg,var(--teal),#22d3ee);transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+    .difference{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:10vw;font-weight:900;letter-spacing:-.03em;animation:floatUp 1.1s cubic-bezier(.25,.46,.45,.94) forwards;opacity:1;text-shadow:0 12px 40px rgba(0,0,0,.6);-webkit-text-stroke:1px rgba(0,0,0,.6);filter:drop-shadow(0 0 16px currentColor)}
+    @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+    @keyframes floatUp{0%{transform:translate(-50%,0) scale(.9);opacity:1}100%{transform:translate(-50%,-80px) scale(.75);opacity:0}}
+    .blink{animation:blink .8s cubic-bezier(.4,0,.2,1)}
+    @keyframes blink{0%{transform:scale(1)}50%{transform:scale(1.015)}100%{transform:scale(1)}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" id="card">
+    <div class="grid-bg"></div>
+
+    <h1 class="title">Matrículas por Unidade</h1>
+    <div class="sub">Fonte: TOTVS RM (SMP.0025). Atualiza a cada 10s.</div>
+    <div class="update" id="utime">—</div>
+
+    <!-- TOTAL -->
+    <div class="counter" id="counter">0</div>
+
+    <!-- PROGRESSO GERAL -->
+    <div class="progress-wrap">
+      <div class="bar"><div class="fill" id="fill"></div></div>
+      <div class="info" id="info"></div>
+    </div>
+
+    <!-- LISTA DE FILIAIS -->
+    <div class="rows" id="rows"></div>
+  </div>
+</div>
+
+<script>
+  // =========================
+  // CONFIG – CREDENCIAIS / API (SEM BACKEND)
+  // =========================
+  // ⚠️ Este HTML contém usuário/senha em claro; use apenas em ambiente controlado (TV interna).
+  const USUARIO = "p_heflo";
+  const SENHA   = "Q0)G$sW]rj";
+  const API_URL = "https://raizeducacao160286.rm.cloudtotvs.com.br:8051/api/framework/v1/consultaSQLServer/RealizaConsulta/SMP.0025/0/S";
+  const REFRESH_MS = 10000; // 10s
+
+  // Metas por filial informadas:
+  const METAS_POR_FILIAL = {
+    "BANGU": 1017,
+    "CAMPO GRANDE": 1009,
+    "DUQUE DE CAXIAS": 404,
+    "MADUREIRA": 516,
+    "NOVA IGUACU": 672,          // normalização cobre IGUAÇU
+    "RETIRO DOS ARTISTAS": 548,
+    "ROCHA MIRANDA": 737,
+    "SAO JOAO DE MERITI": 562,   // normalização cobre SÃO JOÃO DE MERITI
+    "TAQUARA": 623,
+    "TIJUCA": 308
+  };
+  const META_GERAL = Object.values(METAS_POR_FILIAL).reduce((a,b)=>a+b,0);
+
+  // =========================
+  // UTILS
+  // =========================
+  const fmtNum = n => Number(n||0).toLocaleString('pt-BR');
+  function normalize(str){
+    if(!str) return "";
+    return str
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g,'')  // remove acentos
+      .replace(/\s+/g,' ')
+      .trim()
+      .toUpperCase();
+  }
+  function keywordFromNomeFantasia(nome){
+    const norm = normalize(nome);
+    for(const kw of Object.keys(METAS_POR_FILIAL)){
+      if(norm.includes(kw)) return kw;   // match por substring
+    }
+    return null;
+  }
+
+  // =========================
+  // DOM refs
+  // =========================
+  const $card    = document.getElementById('card');
+  const $counter = document.getElementById('counter');
+  const $fill    = document.getElementById('fill');
+  const $info    = document.getElementById('info');
+  const $rows    = document.getElementById('rows');
+  const $utime   = document.getElementById('utime');
+
+  // estado
+  let lastTotal = 0;
+  const lastByFilial = new Map();
+
+  function showTotalDiff(diff){
+    if(!diff) return;
+    const el = document.createElement('div');
+    el.className = 'difference';
+    el.textContent = (diff>0?'+':'') + diff;
+    el.style.color = diff>0 ? '#22c55e' : '#ef4444';
+    $card.appendChild(el);
+    setTimeout(()=>el.remove(), 1100);
+  }
+
+  function animateNumber(el, from, to, dur=400){
+    const start = performance.now();
+    const step = (t)=>{
+      const p = Math.min(1, (t-start)/dur);
+      const cur = Math.round(from + (to-from)*p);
+      el.textContent = cur.toLocaleString('pt-BR');
+      if(p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  function updateTotal(total){
+    const diff = total - lastTotal;
+    if(lastTotal !== 0) showTotalDiff(diff);
+    animateNumber($counter, lastTotal, total, 450);
+    lastTotal = total;
+
+    const pctGeral = META_GERAL>0 ? (total/META_GERAL)*100 : 0;
+    const faltamG  = Math.max(0, META_GERAL - total);
+
+    $fill.style.width = `${Math.min(pctGeral,100).toFixed(2)}%`;
+    $fill.classList.add('blink');
+    setTimeout(()=> $fill.classList.remove('blink'), 700);
+
+    $info.innerHTML = `
+      <div>${pctGeral.toFixed(2)}% da meta geral · Meta: <span class="strong">${fmtNum(META_GERAL)}</span> · Faltam: <span class="strong">${fmtNum(faltamG)}</span></div>
+    `;
+  }
+
+  function renderFiliais(list, total){
+    // agrega por keyword e soma matrículas
+    const agg = new Map(); // kw -> {nome, matriculas, meta}
+    list.forEach(item=>{
+      const filialRaw = (item.FILIAL || item.NOMEFANTASIA || item.Filial || "").trim();
+      const kw = keywordFromNomeFantasia(filialRaw) || normalize(filialRaw);
+      let matr = Number(item.MATRICULAS || item.Matriculas || item.QTD || 0);
+      if(!agg.has(kw)){
+        agg.set(kw, { nome: kw, matriculas: 0, meta: METAS_POR_FILIAL[kw] || null });
+      }
+      agg.get(kw).matriculas += isFinite(matr) ? Math.round(matr) : 0;
+    });
+
+    // ordena por matrículas desc
+    const linhas = [...agg.values()].sort((a,b)=> b.matriculas - a.matriculas);
+
+    const frag = document.createDocumentFragment();
+    linhas.forEach(item=>{
+      const key  = item.nome;
+      const val  = Number(item.matriculas || 0);
+      const meta = Number(item.meta || 0);
+
+      // cria elemento
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.setAttribute('data-key', key);
+      row.innerHTML = `
+        <div class="row-top">
+          <div class="name"></div>
+          <div class="value"></div>
+        </div>
+        <div class="mini"><div class="mini-fill"></div></div>
+      `;
+      row.querySelector('.name').textContent = key;
+
+      // valor + meta + faltantes
+      const faltam = meta ? Math.max(0, meta - val) : null;
+      const metaHtml = meta ? ` / meta ${fmtNum(meta)} · faltam ${fmtNum(faltam)}` : '';
+      row.querySelector('.value').innerHTML = `${fmtNum(val)}${metaHtml}`;
+
+      // largura da barra: se tiver meta da filial usa; senão, % do total
+      let pct = 0;
+      if(meta > 0){
+        pct = Math.min(100, (val/meta)*100);
+      } else if(total > 0){
+        pct = Math.min(100, (val/total)*100);
+      }
+      row.querySelector('.mini-fill').style.width = pct.toFixed(2) + '%';
+
+      frag.appendChild(row);
+      lastByFilial.set(key, val);
+    });
+
+    $rows.innerHTML = '';
+    $rows.appendChild(frag);
+  }
+
+  async function tick(){
+    try{
+      const res = await fetch(API_URL, {
+        method:'GET',
+        headers:{ 'Authorization':'Basic ' + btoa(`${USUARIO}:${SENHA}`) },
+        cache:'no-store'
+      });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if(!Array.isArray(data)) throw new Error('Formato inesperado do TOTVS (esperado lista).');
+
+      // total direto do somatório do payload
+      const total = data.reduce((sum, r)=>{
+        const v = Number(r.MATRICULAS || r.Matriculas || r.QTD || 0);
+        return sum + (isFinite(v) ? Math.round(v) : 0);
+      }, 0);
+
+      updateTotal(total);
+      renderFiliais(data, total);
+
+      const nowFmt = new Intl.DateTimeFormat('pt-BR',{
+        day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'
+      }).format(new Date());
+      $utime.textContent = `Atualizado: ${nowFmt}`;
+    }catch(e){
+      console.error(e);
+      $utime.textContent = `Erro: ${e.message}`;
+    }
+  }
+
+  tick();
+  setInterval(tick, REFRESH_MS);
+</script>
+</body>
+</html>
